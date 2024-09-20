@@ -1,50 +1,107 @@
-# Welcome to your Expo app 👋
+# 스티키 헤더 여러개 만들기
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+ScrollView 에서 제공하는 stickyHeader 를 사용하려면 단순히 [stickyHeaderIndices](https://reactnative.dev/docs/scrollview#stickyheaderindices) 에 스티키 헤더가 될 인덱스를 넣으면 된다. 하지만 인덱스 여러개를 넣게되면 인덱스에 포함되는 행들이 차례로 쌓이는게 아니라 두번 째 행이 위에 붙게되면 원래 붙어있었던 첫번 째 행은 위로 올라가 사라지고 만다. 나는 여러개의 행이 차례로 쌓이는 이른바 multiple sticky header 를 만드는 방법에 대해 내가 고민했던 방법을 정리하고자 한다.
 
-## Get started
+There is [stickyHeaderIndices](https://reactnative.dev/docs/scrollview#stickyheaderindices) option in ScrollView if you need simple sticky header. However I need multiple sticky header which is stacked each sticky headers when user scroll up and the header is gone.
 
-1. Install dependencies
+기본적인 원리는 스크롤 뷰 위에 스티키 헤더를 absolute 로 겹쳐놓고 스크롤의 y 좌표가 해당 헤더 위치를 지나가면 겹쳐놓은 스티키 헤더의 display 를 none 에서 flex 로 변경해주는 것이다.
 
-   ```bash
-   npm install
-   ```
+Basic idea is overlapping invisible header over scrollView and when the header moving up touching top of the view, make the invisible header visible.
 
-2. Start the app
+```js
+<SafeAreaView>
+  <View>
+    <ScrollView onScroll={handleScroll}>// 1
+      <Contents>
+        <Text>zero contents</Text>
+      </Contents>
+      <Header onLayout={handleLayout(setFirstHeaderLayout)}>// 2        
+        <Text>first header</Text>
+      </Header>
+      <Contents>
+        <Text>first contents</Text>
+      </Contents>
+      ...
+    </ScrollView>
 
-   ```bash
-    npx expo start
-   ```
+    <View style={styles.stickyHeader}>  // 3
+      <Header style={firstHeaderAnimatedStyle}> // 4
+        <Text>first header</Text>
+      </Header>
+      ...
+    </View>
+  </View>
+</SafeAreaView>;
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+const styles = StyleSheet.create({
+  header: {
+    height: 100,
+    backgroundColor: "#D3D3D3",
+  },
+  item: {
+    width: "100%",
+    backgroundColor: "#AEC6CF",
+    height: 500,
+  },
+  stickyHeader: {
+    position: "absolute",
+    width: "100%",
+  },
+});
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+기본적인 스타일은 위와 같다.
 
-## Learn more
+Basic style is like above.
 
-To learn more about developing your project with Expo, look at the following resources:
+위에 주석으로 써놓은 1번부터 설명을 하자면
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+I will explain from the first of annotation
 
-## Join the community
+1. 스크롤 뷰가 움직일 때 해당 y 값을 useSharedValue 로 관리한다.
 
-Join our community of developers creating universal apps.
+Manage Y coordinate location using usSharedValue when scrolled
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```js
+const scrollY = useSharedValue(0);
+
+const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+  scrollY.value = e.nativeEvent.contentOffset.y;
+};
+```
+
+2. 헤더의 위치를 알아야 1번의 scrollY 와 비교할 수 있으므로 아래와 같이 handleLayout 을 Header의 onLayout 에 넣어 렌더가 되었을 때 헤더의 수치를 저장한다.
+
+To compare between scrolled y coordination with header's y coordination, store header's layout when the header rendered
+
+```js
+const [firstHeaderLayout, setFirstHeaderLayout] =
+    useState<LayoutRectangle>(defaultLayout); // defaultLayout 은 옵셔널에 의한 코드 가독성 저하를 방지하기 위해 적당히 넣어주었다.
+
+const handleLayout =
+  (setter: Dispatch<React.SetStateAction<LayoutRectangle>>) =>
+  (e: LayoutChangeEvent) => {
+    setter(e.nativeEvent.layout);
+  };
+```
+
+3. position: 'absolute' 로 스크롤뷰와 스티키 헤더를 겹쳐놓은 상황
+
+Style includes position: 'absolute' to overlap on the scrollView
+
+4. 여기서 animatedStyle 로 스크롤 뷰의 y 값이 headerLayout 의 y 값을 넘어갔을 때 보여지도록 한다.
+
+When scrollView is scrolled, which is header is moved up and touch the top of screen, make the header visible.
+
+```js
+const firstHeaderAnimatedStyle = useAnimatedStyle(
+  () => ({
+    display: scrollY.value > firstHeaderLayout.y ? "flex" : "none",
+  }),
+  [firstHeaderLayout],
+);
+```
+
+두번째 헤더 역시 같은 원리를 적용하면 위에서부터 차곡차곡 쌓이는 멀티플 스티키 헤더가 된다.
+
+If you use above idea for second header, you can see multiple header is stacked.

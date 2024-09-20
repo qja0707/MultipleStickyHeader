@@ -1,70 +1,172 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { Dispatch, useState, JSX, useEffect } from "react";
+import {
+  LayoutChangeEvent,
+  LayoutRectangle,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import Animated, {
+  AnimatedStyle,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+const defaultLayout: LayoutRectangle = {
+  x: 0,
+  y: 0,
+  height: 0,
+  width: 0,
+};
+interface IProps {
+  style?: AnimatedStyle;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  children: JSX.Element;
+}
+
+const Header = (props: IProps) => {
+  const { style, onLayout, children } = props;
+
+  return (
+    <Animated.View style={[styles.header, style]} onLayout={onLayout}>
+      {children}
+    </Animated.View>
+  );
+};
+
+const Contents = (props: IProps) => {
+  const { children } = props;
+
+  return <View style={styles.item}>{children}</View>;
+};
 
 export default function HomeScreen() {
+  const [firstHeaderLayout, setFirstHeaderLayout] =
+    useState<LayoutRectangle>(defaultLayout);
+  const [secondHeaderLayout, setSecondHeaderLayout] =
+    useState<LayoutRectangle>(defaultLayout);
+  const [thirdHeaderLayout, setThirdHeaderLayout] =
+    useState<LayoutRectangle>(defaultLayout);
+
+  const scrollY = useSharedValue(0);
+
+  useEffect(() => {
+    console.log(firstHeaderLayout.y);
+  }, []);
+
+  const firstHeaderAnimatedStyle = useAnimatedStyle(
+    () => ({
+      display: scrollY.value > firstHeaderLayout.y ? "flex" : "none",
+    }),
+    [firstHeaderLayout],
+  );
+
+  const secondHeaderAnimatedStyle = useAnimatedStyle(
+    () => ({
+      display:
+        scrollY.value + firstHeaderLayout.height > secondHeaderLayout.y
+          ? "flex"
+          : "none",
+    }),
+    [firstHeaderLayout, secondHeaderLayout],
+  );
+
+  const thirdHeaderAnimatedStyle = useAnimatedStyle(
+    () => ({
+      display:
+        scrollY.value + firstHeaderLayout.height + secondHeaderLayout.height >
+        thirdHeaderLayout.y
+          ? "flex"
+          : "none",
+    }),
+    [firstHeaderLayout, secondHeaderLayout],
+  );
+
+  const handleLayout =
+    (setter: Dispatch<React.SetStateAction<LayoutRectangle>>) =>
+    (e: LayoutChangeEvent) => {
+      setter(e.nativeEvent.layout);
+    };
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.value = e.nativeEvent.contentOffset.y;
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView>
+      <View>
+        <ScrollView onScroll={handleScroll}>
+          <Contents>
+            <Text>zero contents</Text>
+          </Contents>
+
+          <Header onLayout={handleLayout(setFirstHeaderLayout)}>
+            <Text>first header</Text>
+          </Header>
+
+          <Contents>
+            <Text>first contents</Text>
+          </Contents>
+
+          <Header onLayout={handleLayout(setSecondHeaderLayout)}>
+            <Text>second header</Text>
+          </Header>
+
+          <Contents>
+            <Text>second contents</Text>
+          </Contents>
+
+          <Header onLayout={handleLayout(setThirdHeaderLayout)}>
+            <Text>third header</Text>
+          </Header>
+
+          <Contents>
+            <Text>third contents</Text>
+          </Contents>
+
+          <Header>
+            <Text>forth header</Text>
+          </Header>
+
+          <Contents>
+            <Text>forth contents</Text>
+          </Contents>
+        </ScrollView>
+
+        <View style={styles.stickyHeader}>
+          <Header style={firstHeaderAnimatedStyle}>
+            <Text>first header</Text>
+          </Header>
+
+          <Header style={secondHeaderAnimatedStyle}>
+            <Text>second header</Text>
+          </Header>
+
+          <Header style={thirdHeaderAnimatedStyle}>
+            <Text>third header</Text>
+          </Header>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  header: {
+    height: 100,
+    backgroundColor: "#D3D3D3",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  item: {
+    width: "100%",
+    backgroundColor: "#AEC6CF",
+    height: 500,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  stickyHeader: {
+    position: "absolute",
+    width: "100%",
   },
 });
